@@ -2,7 +2,6 @@
 
 from typing import List
 
-from models.card import SUITS, RANKS
 from models.deck import Deck
 from models.player import Player
 
@@ -10,48 +9,35 @@ from models.player import Player
 class Controller:
     """Main controller."""
 
-    def __init__(self, deck: Deck, view):
+    def __init__(self, deck: Deck, views, checker_strategy):
         """Has a deck, a list of players and a view."""
         # models
         self.players: List[Player] = []
         self.deck = deck
 
         # views
-        self.view = view
+        self.views = views
+
+        # check strategy
+        self.checker_strategy = checker_strategy
 
     def get_players(self):
-        """Get some players."""
         while len(self.players) < 5:  # nombre magique
-            name = self.view.prompt_for_player()
-            if not name:
-                return
-            player = Player(name)
-            self.players.append(player)
+            choices = []
+            for view in self.views:
+                name = view.prompt_for_player()
+                choices.append(name)
+                if not any(choices):
+                    return
+            for choice in choices:
+                if choice:
+                    name = choice
+                    player = Player(name)
+                    self.players.append(player)
 
     def evaluate_game(self):
-        """Evaluate the best player."""
-        last_player = self.players[0]
-        best_candidate = self.players[0]
-
-        for player in self.players[1:]:
-            player_card = player.hand[0]
-            last_player_card = last_player.hand[0]
-
-            score = (RANKS.index(player_card.rank), SUITS.index(player_card.suit))
-            last_score = (
-                RANKS.index(last_player_card.rank),
-                SUITS.index(last_player_card.suit),
-            )
-
-            if player_card > last_player_card:
-                if score[1] > last_score[1]:
-                    best_candidate = player
-            elif score[0] > last_score[0]:
-                best_candidate = player
-
-            last_player = player
-
-        return best_candidate.name
+        """Evaluate the game."""
+        return self.checker_strategy.check(self.players)
 
     def rebuild_deck(self):
         """Rebuild the deck."""
@@ -71,25 +57,33 @@ class Controller:
                 player.hand.append(card)
 
     def run(self):
-        """Run the game."""
         self.get_players()
-        self.start_game()
 
         running = True
         while running:
-
             self.start_game()
             for player in self.players:
-                self.view.show_player_hand(player.name, player.hand)
 
-            self.view.prompt_for_flip_cards()
+                for view in self.views:
+                    view.show_player_hand(player.name, player.hand)
+
+            for view in self.views:
+                view.prompt_for_flip_cards()
+            print()
+
             for player in self.players:
                 for card in player.hand:
                     card.is_face_up = True
+                for view in self.views:
+                    view.show_player_hand(player.name, player.hand)
+            print()
 
-                self.view.show_player_hand(player.name, player.hand)
+            for view in self.views:
+                view.show_winner(self.evaluate_game())
 
-            self.view.show_winner(self.evaluate_game())
-            running = self.view.prompt_for_new_game()
+            for view in self.views:
+                running = view.prompt_for_new_game()
+                if not running:
+                    return
 
             self.rebuild_deck()
