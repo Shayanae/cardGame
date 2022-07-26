@@ -11,5 +11,6 @@ def main():
     game = Controller(deck, view)
     game.run()
 
-main()
 
+if __name__ == "__main__":
+    main()
